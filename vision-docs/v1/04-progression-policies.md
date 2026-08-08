@@ -8,6 +8,11 @@ Progression happens at two separate levels:
 Exercise A may progress while exercise B is maintained and exercise C is regressed.
 One stalled exercise should not cause a whole-program deload.
 
+The **Continuous Progression Model** below is the authoritative v1 decision
+algorithm. The OG2-style discrete outcomes and examples above it define invariants,
+fallback expectations, and golden test scenarios; they are not a second policy
+implementation.
+
 ## Progression Loop
 
 ```
@@ -60,24 +65,13 @@ technique honestly.
 
 ```
 decide_next_exposure(exercise, recent_exposures, athlete):
-  latest = evaluate_exercise(recent_exposures.latest)
-  stage = progression_stage(athlete, exercise)
-
-  if latest == STOP_AND_SEEK_SAFE_GUIDANCE:
-    return STOP
-
-  if latest in [EASY_PASS, PASS]:
-    return progression_for_training_level(exercise, stage)
-
-  if latest == HARD_PASS:
-    return MAINTAIN
-
-  if latest == FAIL and previous exposure was not FAIL:
-    return MAINTAIN  # repeat once before changing the prescription
-
-  if latest == FAIL and previous exposure was FAIL:
-    return REGRESS_ONE_VARIABLE
+  state = update_continuous_exercise_evidence(exercise, recent_exposures)
+  return continuous_exercise_decision(state, exercise.current_prescription)
 ```
+
+The authoritative decision retains the OG2 behavior that one unsuccessful exposure
+normally causes `MAINTAIN`, while repeated supported regression evidence causes
+`REGRESS_ONE_VARIABLE`.
 
 Regression should make the smallest useful change:
 
@@ -100,69 +94,16 @@ regress_one_variable(exercise):
   preserve every other variable
 ```
 
-## Progression by Training Level
+## Progression Cadence Priors
 
-Use the simplest progression that still produces progress.
-
-Progression level is exercise-specific. An athlete may be a beginner on one lift
-and intermediate or advanced on another. Use the athlete's onboarding level as the
-initial default, then update each exercise from its observed rate of progress:
-
-```
-progression_stage(athlete, exercise):
-  BEGINNER = can progress the exercise workout to workout
-  INTERMEDIATE = can progress the exercise every few workouts or weekly
-  ADVANCED = requires planned mesocycle progression
-```
-
-### Beginner
-
-Beginners should generally progress workout to workout using double progression.
-
-```
-progress_beginner(exercise):
-  if not all sets have reached top_of_rep_range:
-    add 1 total rep to the exercise
-    # Example: 5/5/5 -> 6/5/5 -> 6/6/5 -> 6/6/6.
-  else:
-    advance_progression_track(exercise)
-```
+Beginner and intermediate are initial priors, not permanent switches. A beginner
+exercise starts with an adaptation-rate prior of `1.0`, favoring workout-to-workout
+progression. An intermediate exercise starts at `0.5`, normally requiring about two
+successful exposures. The continuous model updates that rate independently for each
+exercise from observed responses to overload.
 
 For weighted-bodyweight exercises, `load` means external load. Dumbbell and barbell
-increments depend on the equipment available and the exercise.
-
-```
-advance_progression_track(exercise):
-  if modality_policy == FIXED_EXERCISE
-     and the next load increment is permitted by the mutation envelope:
-    add smallest_available_load_increment(exercise)
-    reset all sets to bottom_of_rep_range
-
-  else if modality_policy == DECLARED_PROGRESSION_PATH
-          and progression evidence satisfies a declared outgoing edge:
-    move to that edge's next exercise
-    reset the prescription as declared by the edge
-
-  else:
-    return STOP_PROGRAM(PROGRESSION_BOUNDARY_REACHED)
-```
-
-### Intermediate
-
-Intermediates should generally progress every few workouts or weekly.
-
-```
-progress_intermediate(exercise):
-  require 2 successful exposures at the current prescription
-
-  if not all sets have reached top_of_rep_range:
-    add 1 total rep to the exercise
-  else:
-    advance_progression_track(exercise)
-```
-
-If this no longer works within the program's mutation envelope, flag the program to
-stop rather than adding multiple progression variables at once.
+increments come from the athlete's available equipment.
 
 ### Advanced
 
@@ -182,38 +123,9 @@ Detailed advanced periodization is outside the first progression-policy version.
 
 ## Program-level Review
 
-The program review aggregates exercise decisions without replacing them.
-
-```
-review_program(program, completed_sessions):
-  for exercise in program.exercises:
-    exercise_decision[exercise] = decide_next_exposure(exercise)
-
-  if any exercise_decision == STOP:
-    return STOP_PROGRAM(SAFETY_STOP)
-
-  if decline is isolated to one exercise or one movement category:
-    apply only its exercise-level MAINTAIN or REGRESS decision
-    return CONTINUE_PROGRAM
-
-  broad_regression = (
-    at least half of primary exercises regress
-    and regression spans at least 2 movement categories
-    and affected exercises regress across 2 consecutive comparable exposures
-  )
-
-  if broad_regression and RPE rises for the same or less work:
-    return PERFORMANCE_TRIGGERED_DELOAD
-
-  broad_stall = most primary exercises make no progress
-  if primary exercises are mostly BEGINNER and broad_stall lasts about 1 week:
-    return PERFORMANCE_TRIGGERED_DELOAD
-  if primary exercises are mostly INTERMEDIATE or ADVANCED
-     and broad_stall lasts about 4 weeks:
-    return PERFORMANCE_TRIGGERED_DELOAD
-
-  return CONTINUE_PROGRAM
-```
+The program review uses the authoritative continuous aggregation below. It preserves
+isolated exercise decisions and escalates only coordinated, sufficiently confident
+decline or stall across primary exercises and movement categories.
 
 NovaFit does not measure or diagnose CNS fatigue. A program-level deload is inferred
 only from coordinated performance and RPE trends. Sleep, readiness, and recovery
@@ -223,10 +135,12 @@ data remain outside v1.
 
 ```
 performance_triggered_deload(program):
-  use 1–2 light sessions for the week
-  retain one push, one pull, and one leg exercise
-  prescribe 1–2 easy sets per exercise, well away from failure
+  require program.performance_triggered_deload_count < 1
+  use 1–2 light sessions over 7 days
+  retain the highest-priority declared exercise in each represented movement category
+  prescribe 1–2 sets at anchor reps and a load supporting at least 4 RIR
   preserve technique and movement familiarity
+  increment program.performance_triggered_deload_count
 
   after deload:
     if program.retest_policy.trigger == AFTER_EVERY_DELOAD:
@@ -261,7 +175,8 @@ RetestPolicy {
 Simple beginner and intermediate programs default to `AFTER_EVERY_DELOAD`. Advanced
 periodized programs default to `AT_PROGRAM_END`, allowing planned internal deloads
 without forcing a maximal test. Any completed retest ends the current program and
-returns control to program generation.
+returns control to program generation. Each program permits one performance-triggered
+deload; a planned advanced deload does not count toward that limit.
 
 The athlete remains responsible for warming up, progresses from easy attempts, rests
 3–5 minutes before the test, and stops before technique breaks down. The test uses
@@ -301,8 +216,8 @@ RIR_adjusted_e1RM = estimate_1RM(load, completed_reps + reported_RIR)
 ```
 
 Use the best valid clean `RIR_adjusted_e1RM` as the session's estimated-strength
-observation. Retain the raw value for auditing. If RIR is missing, use the raw value
-with lower confidence.
+observation. Retain the raw value for auditing. RPE and RIR are mandatory for every
+completed work-set observation.
 
 For weighted pull-ups, estimate from total system load (`bodyweight + external_load`),
 then subtract bodyweight when reporting the equivalent external load. Dumbbell loads
@@ -313,141 +228,245 @@ generation. Standard load increments and progression parameters belong to this
 policy.
 
 ---
-# Continuous Progression Model
+# Continuous Progression Model — Authoritative v1 Policy
 
-The rules above describe the OG2 heuristics that NovaFit must satisfy. They should
-not be implemented as rigid beginner/intermediate/advanced switches. NovaFit should
-accumulate evidence continuously, then use that evidence to choose the discrete
-next action: `PROGRESS`, `MAINTAIN`, `REGRESS`, or `STOP`.
+V1 uses a deterministic continuous evidence model with discrete actions:
+`PROGRESS`, `MAINTAIN`, `REGRESS`, `DELOAD`, or `STOP`. OG2 heuristics supply initial
+priors, hard boundaries, and fallback scenarios. This is not a learned model; every
+input, contribution, threshold, state update, and decision is versioned and stored.
 
-The heuristic timeframes above are initial priors and fallbacks, not hard boundaries.
-As the athlete logs more comparable exposures, their own data should increasingly
-determine the progression cadence.
+Pain remains a hard stop outside the score. Sleep, readiness, and recovery data are
+not v1 inputs.
 
-## Exercise Evidence State
+## Comparable Exposures
 
-Each exercise maintains independent bounded `[0, 1]` evidence values:
+Two exposures are **prescription-comparable** when they use the same exercise,
+role, set count, rep target, load, rest, and tempo. Use them for consecutive-failure
+and same-work effort comparisons.
+
+Two exposures are **strength-comparable** when they use the same exercise, role,
+tempo, rep range, and progression track, and differ only through permitted rep or
+load mutations. Use RIR-adjusted e1RM to compare them. A set-count or role change
+starts a new comparison window. Capability tests, deload work, undeclared work,
+invalid logs, and non-performance skips are not training exposures.
+
+Use at most the previous 12 comparable exposures from the previous 42 days. Within
+that window, multiply each older observation's weight by `0.8` for every newer
+comparable exposure. A valid complete log has weight `1.0`; a non-comparable
+observation has weight `0`.
+
+## Exercise Evidence State and Signals
 
 ```
-ExerciseEvidence {
-  progression_evidence  # evidence that more overload is appropriate
-  regression_evidence   # evidence that the current prescription is excessive
-  confidence            # quantity and consistency of relevant observations
-  progression_rate      # observed rate of improvement across exposures
+ExerciseEvidenceState {
+  progress_credit             # [0, 1.5]
+  regression_pressure         # [0, 1]
+  confidence                  # [0, 1]
+  adaptation_rate             # [0.25, 1]
+  consecutive_underperformances
+  comparable_exposure_history
+  last_action
 }
 ```
 
-These values are decision signals, not probabilities. Every update must retain the
-observations and weights that produced it so NovaFit can explain the decision.
+For each comparable exposure:
 
 ```
-update_exercise_evidence(state, completed_exposure):
-  observations = normalize(
-    completion relative to prescription,
-    ending RIR relative to target RIR,
-    reps and load relative to comparable exposures,
-    estimated strength trend,
-    technique status
-  )
+completion_ratio = completed_prescribed_reps / prescribed_reps
+effort_delta = reported_RIR - target_RIR
+strength_delta = change in RIR_adjusted_e1RM versus the weighted median
+                 of the previous 3 strength-comparable exposures
 
-  weight recent comparable exposures more heavily
-  update progression_evidence
-  update regression_evidence
-  update confidence from evidence quantity and consistency
-  update progression_rate from successful overload over time
+positive_strength = clamp((strength_delta - 0.01) / 0.02, 0, 1)
+success_evidence = completion_ratio
+                   * clamp(1 + 0.5 * effort_delta
+                             + 0.25 * positive_strength, 0, 1.25)
 
-  return state with an explanation of each contribution
+incompletion = 0                                      if completion_ratio == 1
+               0.5 + 0.5 * (1 - completion_ratio)   otherwise
+overexertion = clamp((target_RIR - reported_RIR) / 2, 0, 1)
+strength_decline = clamp((-strength_delta - 0.01) / 0.02, 0, 1)
+
+regression_observation = 0.60 * incompletion
+                         + 0.25 * overexertion
+                         + 0.15 * strength_decline
 ```
 
-Pain remains a hard stop and is not softened into a score. Sleep, readiness, and
-recovery data are not inputs in v1.
+Treat e1RM movement inside ±1% as noise. RIR is the effort input; RPE is mandatory
+corroborating data and is never counted as a second effort signal.
 
-## Continuous Exercise Decision
+For every completed work set, require `RPE` and `RIR` and validate:
 
 ```
-decide_next_exposure(state, current_prescription):
+expected_RPE = 10 - reported_RIR
+RPE_RIR_consistent = abs(reported_RPE - expected_RPE) <= 0.5
+```
+
+If either value is absent or the pair is inconsistent, store the submission as
+`NEEDS_CORRECTION(MISSING_EFFORT_DATA | RPE_RIR_MISMATCH)`. Do not update evidence or
+publish the next prescription until the athlete submits an auditable correction.
+
+```
+if exposure is complete:
+  progress_credit = min(1.5,
+    progress_credit + adaptation_rate * observation_weight * success_evidence)
+else:
+  progress_credit = 0.5 * progress_credit
+
+regression_pressure = min(1,
+  0.6 * regression_pressure + observation_weight * regression_observation)
+
+effective_observations = 1 current direct capability assessment
+                         + sum(recency_adjusted_observation_weights)
+confidence = 1 - exp(-effective_observations / 2)
+```
+
+An underperformance is incomplete work or completion at least one RIR harder than
+prescribed. Missing data does not count as underperformance.
+
+## Exercise Decision and Hysteresis
+
+```
+continuous_exercise_decision(state, latest_exposure):
   if pain was reported:
     return STOP
 
-  if state.confidence is insufficient:
+  if confidence < 0.60:
     return MAINTAIN
 
-  if state.progression_evidence is high
-     and state.regression_evidence is low:
-    return PROGRESS_ONE_VARIABLE
-
-  if state.regression_evidence is high:
+  if regression_pressure >= 0.65
+     and consecutive_underperformances >= 2:
     return REGRESS_ONE_VARIABLE
+
+  if progress_credit >= 1.0
+     and regression_pressure <= 0.25
+     and latest exposure was complete at target RIR or easier:
+    return PROGRESS_ONE_VARIABLE
 
   return MAINTAIN
 ```
 
-Use hysteresis: require stronger evidence to change state than to remain in the
-current state. This prevents repeated `PROGRESS` / `REGRESS` oscillation around a
-single threshold.
+After progression, subtract `1.0` from progress credit. After regression, set
+progress credit to `0`, regression pressure to `0.25`, and require a new comparable
+exposure before another mutation. Regression wins if both action thresholds are
+somehow satisfied. This is the v1 hysteresis rule.
 
-## Continuous Progression Cadence
+## Continuous Cadence
 
-Beginner, intermediate, and advanced remain useful descriptions, but the underlying
-policy should use the exercise's observed `progression_rate`:
+Beginner and intermediate labels seed, but do not control, progression cadence. A
+beginner exercise starts with `adaptation_rate = 1.0`; an intermediate exercise
+starts at `0.5`. After each prescribed overload, update the rate from the first
+comparable exposure at the new prescription:
 
 ```
-select_progression_policy(exercise_evidence):
-  faster progression_rate:
-    favor workout-to-workout double progression
+overload_outcome = 1.0   if complete at target RIR or easier
+                   0.25  if complete materially harder than target
+                   0.0   if incomplete
 
-  moderate progression_rate:
-    accumulate evidence across several exposures before progressing
-
-  slower progression_rate:
-    favor planned progression across the mesocycle
+adaptation_rate = clamp(0.8 * adaptation_rate
+                        + 0.2 * overload_outcome, 0.25, 1.0)
 ```
 
-An athlete may therefore move gradually between progression methods, and may use a
-different method for each exercise. The method must still follow OG2: use the
-simplest progression that works and change one variable at a time.
+Repeated successful overload moves an exercise toward workout-to-workout progress;
+difficulty absorbing overload slows it toward one change per several exposures.
+Advanced progression follows its declared mesocycle; continuous evidence may
+maintain or regress it but may not add unplanned overload.
+
+## Load-Aware Double Progression
+
+Every exercise declares an `anchor_rep_count`, normally its initial baseline and
+usually 5 for a primary compound exercise. Once the continuous decision is
+`PROGRESS`, NovaFit chooses the largest conservative supported rep step, while
+capping the automatic change at one additional rep per set per exposure.
+
+```
+rep_surplus = floor(min_recorded_RIR - target_RIR)
+
+if rep_surplus >= 1:
+  rep_candidate = add 1 rep to every set, bounded by the rep-range ceiling
+else:
+  rep_candidate = add 1 total rep in balanced order
+  # 5/5/5 -> 6/5/5 -> 6/6/5 -> 6/6/6
+```
+
+Before selecting the rep candidate, test whether the smallest available load
+increment is already supported at the anchor:
+
+```
+next_load = current_load + smallest_available_increment
+required_e1RM = estimate_1RM(next_load, anchor_rep_count + target_RIR)
+conservative_session_e1RM = lowest valid RIR_adjusted_e1RM among work sets,
+                            or the final/hardest set when only ending RIR exists
+
+load_step_supported = conservative_session_e1RM >= required_e1RM * 1.01
+
+choose_progression_step(exercise, exposure, state):
+  require continuous_exercise_decision(...) == PROGRESS_ONE_VARIABLE
+
+  if load_step_supported:
+    return ADVANCE_LOAD_TIER(next_load, reset_all_sets_to=anchor_rep_count)
+  if rep_surplus >= 1:
+    return INCREASE_EACH_SET_BY_ONE_REP
+  return INCREASE_ONE_TOTAL_REP
+```
+
+`ADVANCE_LOAD_TIER` is one atomic load mutation; its rep reset is not a second
+overload variable. The rep-range ceiling is a boundary, not a required destination.
+This returns work to the baseline rep schema as soon as the next load tier is
+supported and avoids accumulating unnecessary rep volume.
 
 ## Continuous Program Evidence
 
-Program-level analysis aggregates exercise evidence without averaging away its
-structure. It should consider:
-
-* Proportion of primary exercises declining
-* Number of affected movement categories
-* Magnitude of performance and RPE change
-* Synchrony of decline across comparable exposures
-* Persistence of the trend
-* Confidence in the underlying exercise evidence
+`Primary` means an exercise whose current program role is `PRIMARY`. An affected
+exercise has `regression_pressure >= 0.50`. A meaningful effort rise is at least
+`+1 RPE` or `-1 RIR` for prescription-comparable work.
 
 ```
-update_program_evidence(program, exercise_states):
-  local_decline = regression is isolated to an exercise or movement category
-  breadth = proportion of primary exercises and movement categories affected
-  synchrony = degree to which declines occur together
-  persistence = recency-weighted duration of the pattern
+breadth = affected_primary_exercises / primary_exercises
+categories = min(affected_movement_categories / 2, 1)
+synchrony = proportion of affected exercises declining in the same
+            two-comparable-exposure window
+magnitude = mean regression_pressure among affected exercises
 
-  program_regression_evidence = combine(breadth, synchrony, persistence, magnitude)
-  program_confidence = combine(exercise confidence, comparable exposure count)
-
-  if local_decline:
-    preserve the program and apply only exercise-level decisions
-  else if program_regression_evidence is high and program_confidence is sufficient:
-    apply PERFORMANCE_TRIGGERED_DELOAD
-  else:
-    continue accumulating evidence
+program_regression = 0.35 * breadth
+                     + 0.25 * categories
+                     + 0.20 * synchrony
+                     + 0.20 * magnitude
 ```
 
-A single score must never hide why the program changed. NovaFit should store and
-communicate whether the decision came from breadth, magnitude, synchrony,
-persistence, or a combination of them.
+Trigger `PERFORMANCE_TRIGGERED_DELOAD` when `program_regression >= 0.70`, breadth is
+at least `0.50`, at least two movement categories are affected, the decline persists
+across two comparable exposures, meaningful effort rises for the same or less work,
+and mean affected-exercise confidence is at least `0.60`. Otherwise preserve the
+program and apply only exercise-level actions.
+
+A measurable-progress event is a successfully retained rep or load increase, an
+e1RM improvement greater than 1%, or an improvement of at least one RIR at the same
+work. `Most exercises` means more than half of current primary exercises. Determine
+the broad-stall horizon continuously:
+
+```
+rate = median adaptation_rate across primary exercises
+stall_horizon_days = 28 - 21 * clamp((rate - 0.25) / 0.50, 0, 1)
+```
+
+Trigger a performance deload when most primary exercises across at least two
+movement categories have no measurable-progress event for that horizon and program
+confidence is at least `0.60`. If the same broad regression or stall returns after
+the program's one permitted performance-triggered deload, stop and regenerate.
+Planned advanced deloads do not count toward that limit.
+
+Every program-level score must retain its breadth, categories, synchrony, magnitude,
+persistence, confidence, and source observations. A combined score must never hide
+why the program changed.
 
 ## OG2 Policy Boundary
 
-The continuous model decides when to act; OG2 heuristics constrain what actions are
-allowed. It must honor declared goals and any approved structural-balance override,
-target RIR, volume ranges, minimum useful exercise volume, and the rule to change
-one progression variable at a time. All score definitions, weights, thresholds, and
-changes to them must be deterministic, versioned, and auditable.
+The continuous model decides when to act; OG2 constrains the permitted action. It
+must honor target RIR, declared volume and mutation bounds, the smallest available
+load increment, the rule to change one overload variable at a time, and the ban on
+unplanned advanced overload. Policy constants may change only in a new immutable
+policy version with updated golden scenarios.
 
 ---
 # Progression Layer Contract
@@ -614,35 +633,53 @@ hard-coded constants:
 
 ```
 ProgressionPolicyConfig {
-  signal_weights: {
-    completion
-    RIR_delta
-    reps_and_load_trend
-    estimated_strength_trend
-    explicit_technique_breakdown
-  }
+  policy_version
 
-  recency_decay
-  comparable_exposure_window
-  minimum_confidence
-  progression_threshold
-  regression_threshold
-  hysteresis_margin
+  recency_decay_per_exposure: 0.8
+  comparable_exposure_limit: 12
+  comparable_max_age_days: 42
+  e1RM_noise_band: 0.01
+  confidence_threshold: 0.60
 
-  program_breadth_weight
-  program_synchrony_weight
-  program_persistence_weight
-  program_magnitude_weight
-  deload_limit
+  success_effort_weight: 0.50
+  success_strength_weight: 0.25
+  regression_completion_weight: 0.60
+  regression_effort_weight: 0.25
+  regression_strength_weight: 0.15
+
+  progress_credit_threshold: 1.0
+  progress_max_regression_pressure: 0.25
+  regression_pressure_threshold: 0.65
+  required_consecutive_underperformances: 2
+  post_regression_pressure: 0.25
+
+  beginner_adaptation_rate_prior: 1.0
+  intermediate_adaptation_rate_prior: 0.5
+  adaptation_rate_floor: 0.25
+  adaptation_rate_update_old_weight: 0.8
+  adaptation_rate_update_new_weight: 0.2
+
+  max_rep_increase_per_set_per_exposure: 1
+  load_step_e1RM_support_margin: 1.01
+
+  affected_exercise_pressure: 0.50
+  program_breadth_weight: 0.35
+  program_category_weight: 0.25
+  program_synchrony_weight: 0.20
+  program_magnitude_weight: 0.20
+  program_regression_threshold: 0.70
+  minimum_affected_categories: 2
+  meaningful_RPE_change: 1
+  meaningful_RIR_change: 1
+  performance_triggered_deload_limit: 1
 
   fallback_OG2_heuristics
 }
 ```
 
-The initial values should implement the OG2 heuristics above. Athlete-specific data
-may change evidence values and progression cadence, but must not silently change the
-policy configuration. All inputs, contributions, thresholds, and outputs must be
-stored with the decision.
+These are the initial immutable v1 values. Athlete-specific data changes evidence
+state and progression cadence, but never silently changes this configuration. All
+inputs, contributions, thresholds, and outputs are stored with each decision.
 
 ## 6. Logging Edge Cases
 
@@ -654,8 +691,14 @@ classify_logged_exposure(log):
   if the entire workout or exercise is unlogged:
     return NO_OBSERVATION  # do not treat missing data as failure
 
-  if the log is invalid or internally inconsistent:
-    return NEEDS_CORRECTION
+  if any completed work set is missing RPE or RIR:
+    return NEEDS_CORRECTION(MISSING_EFFORT_DATA)
+
+  if abs(reported_RPE - (10 - reported_RIR)) > 0.5:
+    return NEEDS_CORRECTION(RPE_RIR_MISMATCH)
+
+  if the log is otherwise invalid or internally inconsistent:
+    return NEEDS_CORRECTION(INVALID_LOG)
 
   if the athlete skipped the exercise because of pain:
     return STOP_AND_SEEK_SAFE_GUIDANCE
@@ -669,9 +712,6 @@ classify_logged_exposure(log):
   if the athlete performed an undeclared exercise or prescription:
     return NON_COMPARABLE  # do not infer progress or regression
 
-  if sets, reps, and load are complete but RIR is missing:
-    use completion evidence only and lower confidence
-
   if the athlete explicitly reports technique breakdown:
     return FAIL
 
@@ -682,4 +722,5 @@ classify_logged_exposure(log):
 Partial workouts must be evaluated exercise by exercise. A valid completed exercise
 may update its own evidence even when another exercise is missing or failed. Late
 log corrections must recompute affected evidence and create an auditable replacement
-decision; previous decisions are preserved.
+decision; previous decisions are preserved. A log awaiting mandatory effort-data
+correction blocks the next prescription for that program.

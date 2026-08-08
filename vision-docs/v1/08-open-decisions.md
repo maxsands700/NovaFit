@@ -117,32 +117,40 @@ evidence model.
 
 ### Why a decision is needed
 
-The discrete heuristics and continuous model do not yet form one executable policy.
-The continuous model says that the training levels should not be rigid switches,
-but its weights, thresholds, comparison windows, confidence calculation, recency
-decay, and hysteresis are unspecified.
+The continuous model is now the authoritative executable policy, with OG2 heuristics
+as versioned guardrails and fallback scenarios.
 
-### Questions to resolve
+### Resolved checklist
 
-1. Will the first policy version use the explicit discrete heuristics, a fully
-   specified continuous model, or a deliberately staged combination of both?
-2. What makes two exposures comparable?
-3. How are completion, RIR delta, RPE, load/reps trend, estimated strength, failed
-   reps, and technique combined?
-4. What values define sufficient confidence and high or low evidence?
-5. How many past exposures are considered, and how does evidence decay with time?
-6. What exact hysteresis rule prevents progress/regress oscillation?
-7. How and when does an exercise move between beginner, intermediate, and advanced
-   progression behavior?
-8. What is the exact definition of a primary exercise, broad stall, most exercises,
-   and a meaningful RPE rise?
-9. Does one failed exposure followed by another always cause regression, or can the
-   continuous evidence state override that heuristic?
-10. What exact prescription is used for a deload, and what counts toward the deload
-    limit?
-11. When does goal achievement trigger a retest, program completion, or immediate
-    program regeneration?
-12. What happens when RPE and RIR are absent or internally inconsistent?
+- [x] **2.1 Policy form:** Use one authoritative deterministic continuous evidence
+  model with discrete OG2-constrained actions and heuristic fallback scenarios.
+- [x] **2.2 Comparability:** Distinguish prescription-comparable from normalized
+  strength-comparable exposures; exclude tests, deloads, invalid, and undeclared work.
+- [x] **2.3 Signals:** Combine completion, RIR/RPE effort delta, and RIR-adjusted e1RM
+  trend with explicit versioned formulas.
+- [x] **2.4 Thresholds:** Use declared v1 confidence, progress-credit, regression,
+  and program-level thresholds.
+- [x] **2.5 Evidence window:** Use at most 12 comparable exposures over 42 days with
+  `0.8` per-exposure recency decay.
+- [x] **2.6 Hysteresis:** Use separate progression/regression boundaries, reset state
+  after mutation, and require a new comparable exposure before another change.
+- [x] **2.7 Cadence:** Seed per-exercise adaptation rate from training level, then
+  update it continuously from observed overload outcomes; advanced overload remains
+  constrained by its declared mesocycle.
+- [x] **2.8 Program definitions:** Define primary, affected, breadth, broad stall,
+  synchrony, movement-category coverage, and meaningful RPE/RIR change numerically.
+- [x] **2.9 Repeated failure:** Regression requires both continuous pressure and at
+  least two consecutive underperformances; two logs alone do not bypass confidence.
+- [x] **2.10 Deload:** Permit one seven-day performance-triggered deload of 1–2 light
+  sessions, 1–2 sets at anchor reps and at least 4 RIR; planned advanced deloads do
+  not count toward the limit.
+- [x] **2.11 Goal completion:** Use the completion, retest, end-report, and regeneration
+  contract resolved in decision 1.11.
+- [x] **2.12 Effort data:** Require RPE and RIR for every completed work set. Accept a
+  pair when `abs(RPE - (10 - RIR)) <= 0.5`; otherwise require an auditable correction
+  and block evidence updates and the next prescription.
+
+All progression-policy questions in this section are resolved.
 
 ### Decision complete when
 
@@ -207,22 +215,26 @@ The progression contract requires evidence the current athlete-input contract ca
 always express. The documents also differ on whether pain stops only the affected
 exercise or stops the entire program.
 
-### Questions to resolve
+### Resolved checklist
 
-1. Must the athlete always use the prescribed load, or must actual completed load be
+- [x] **4.6 RPE/RIR requirement:** Both are mandatory for every completed work set;
+  RIR drives progression and RPE is corroborating validation data.
+- [x] **4.7 RPE/RIR validation:** Accept pairs within `0.5` of `RPE = 10 - RIR`;
+  otherwise preserve the submission and require an auditable correction.
+
+### Questions remaining
+
+- **4.1** Must the athlete always use the prescribed load, or must actual completed load be
    loggable per set?
-2. How does the athlete report explicit technique breakdown?
-3. Is `Failed Reps` a count, a per-set boolean, or an exercise-level signal?
-4. How are skipped exercises, skipped sets, and workouts abandoned midway represented?
-5. Which skip reasons are performance-related, pain-related, or non-comparable?
-6. Are RPE and RIR both requested, or should the interface prefer one and treat the
-   other as optional corroborating evidence?
-7. What validation applies when RPE and RIR contradict each other?
-8. When pain is reported, does NovaFit stop the exercise, hold the next workout, end
+- **4.2** How does the athlete report explicit technique breakdown?
+- **4.3** Is `Failed Reps` a count, a per-set boolean, or an exercise-level signal?
+- **4.4** How are skipped exercises, skipped sets, and workouts abandoned midway represented?
+- **4.5** Which skip reasons are performance-related, pain-related, or non-comparable?
+- **4.8** When pain is reported, does NovaFit stop the exercise, hold the next workout, end
    the entire program, or choose among those actions using a declared rule?
-9. Can an athlete later indicate that a pain entry was accidental, and how does that
+- **4.9** Can an athlete later indicate that a pain entry was accidental, and how does that
    correction affect prior decisions?
-10. What makes a partial workout complete enough to submit and process?
+- **4.10** What makes a partial workout complete enough to submit and process?
 
 ### Decision complete when
 
@@ -367,7 +379,7 @@ At minimum, define exact expected outputs for:
 5. A goal lacking a current exact-exercise capability.
 6. Successful double progression through the top of a rep range and a load increase.
 7. An easy pass, pass, hard pass, first failure, and repeated failure.
-8. Missing RPE/RIR with otherwise complete evidence.
+8. Missing or inconsistent mandatory RPE/RIR rejected and later corrected.
 9. A skipped exercise, partial workout, failed rep, technique breakdown, and pain
    report.
 10. An isolated regression that does not deload the whole program.

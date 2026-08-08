@@ -52,12 +52,13 @@ read-only. The athlete fills out only:
 4. `Failed Reps` — checkbox
 5. `Pain` — checkbox
 
-The athlete may leave RPE and RIR blank when they genuinely do not know them.
-NovaFit stores that as unknown rather than inventing an effort value. A checked
-`Failed Reps` box records that the set included one or more failed reps. A
-checked `Pain` box is a safety signal: NovaFit must hold automatic progression
-for that exercise and direct the athlete to use safe judgment before continuing.
-Normal exertion and ordinary muscle soreness are not pain.
+RPE and RIR are required for every completed work set. The sheet should display the
+expected counterpart while either value is entered. Submission is invalid when a
+value is missing or when `abs(RPE - (10 - RIR)) > 0.5`. A checked `Failed Reps` box
+records that the set included one or more failed reps. A checked `Pain` box is a
+safety signal: NovaFit must hold automatic progression for that exercise and direct
+the athlete to use safe judgment before continuing. Normal exertion and ordinary
+muscle soreness are not pain.
 
 ## Formatting
 
@@ -149,13 +150,14 @@ After a successful import, NovaFit evaluates every exercise independently using
 the completed reps, effort evidence, failed-rep signal, and pain signal. The
 rules in `04-progression-policies.md` determine whether the next exposure
 progresses, stays the same, regresses, or stops. A checked pain box takes
-precedence over normal progression. Missing RPE or RIR can limit confidence in
-a progression decision, but should not cause the system to fabricate data.
+precedence over normal progression. Missing or inconsistent RPE/RIR returns
+`NEEDS_CORRECTION` and blocks the next prescription; the original submission and
+its correcting revision remain auditable.
 
 The athlete's workflow stays deliberately small:
 
 1. Open the published workout.
 2. Perform each prescribed set.
-3. Enter completed reps and, when known, RPE and RIR.
+3. Enter completed reps, RPE, and RIR for every completed work set.
 4. Check Failed Reps or Pain only when they occurred.
 5. Submit the completed workout and await the next published session.

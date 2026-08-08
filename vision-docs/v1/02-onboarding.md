@@ -67,6 +67,10 @@ Each capability should come from one clean near-maximal performance rather than
 accumulated work across multiple sets. Prefer a true 1RM when appropriate; otherwise,
 use a near-maximal low-rep set or the goal's specific success measure.
 
+Every capability assessment requires RPE and RIR satisfying
+`abs(RPE - (10 - RIR)) <= 0.5`; an invalid pair must be corrected before onboarding
+can complete.
+
 NovaFit accepts the athlete's report that the assessment and later training reps use
 good form. Assessing form, pain, or movement quality is outside v1; the athlete is
 responsible for reporting capabilities, RPE, and RIR honestly and for stopping when
