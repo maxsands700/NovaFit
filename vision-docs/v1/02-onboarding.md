@@ -17,13 +17,22 @@ Athlete {
   training_availability: {
     max_sessions_per_week: 5,
     max_session_duration_minutes: 120,
-    preferred_days: ["Monday", "Wednesday", "Friday"]
+    trainable_days: ["Monday", "Wednesday", "Friday"]
   },
 }
 ```
 
+In v1, `trainable_days` is a hard availability constraint, not a soft preference.
+NovaFit never schedules a workout on another day.
+
 ## Athlete Goals
 The second onboarding task is to establish the athlete's goals. Every goal should be SMART: specific, measurable, achievable, relevant, and time-bound. Here are some examples:
+
+Every goal names exactly one supported exercise from the exercise library. That
+exercise reference is canonical: when the athlete has a current capability for it,
+NovaFit programs that exact exercise and does not substitute a variation.
+Onboarding cannot activate the goal until the athlete supplies that direct,
+exercise-specific capability assessment.
 
 ```
 Goal {
@@ -57,6 +66,11 @@ Goal {
 Each capability should come from one clean near-maximal performance rather than
 accumulated work across multiple sets. Prefer a true 1RM when appropriate; otherwise,
 use a near-maximal low-rep set or the goal's specific success measure.
+
+NovaFit accepts the athlete's report that the assessment and later training reps use
+good form. Assessing form, pain, or movement quality is outside v1; the athlete is
+responsible for reporting capabilities, RPE, and RIR honestly and for stopping when
+they cannot perform an exercise safely.
 
 ```
 Capability {
@@ -97,7 +111,14 @@ Individual Goals should be SMART:
 - Time-bound is satisfied by picing a deadline
 
 ## GoalSet Validation
-The entire GoalSet should adhere to the principles of Structural Balance from OG2. A balance of vertical push, vertical pull, horizon push, horizontal pull, legs (knee dominant and posterior chain), core/compression goals. This check/gate can be passed but has to explicitly overriden by the Athlete, notifying the athlete of why Structural Balance is important (perhaps they exclude pulling because they also Rock Climb as an example, this can later be addressed in later NovaFit versions when hybrid training programming exists).
+
+NovaFit evaluates the declared goals for structural balance: vertical push, vertical
+pull, horizontal push, horizontal pull, knee-dominant legs, posterior chain, and
+core/compression. Missing coverage raises a warning. The athlete must either add a
+goal or explicitly override the warning with a reason—for example, because rock
+climbing supplies pulling outside NovaFit. An approved override is accepted as the
+athlete's responsibility; v1 does not model external training or add compensating
+exercises to the program.
 ---
 
 # Method of Onboarding

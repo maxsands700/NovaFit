@@ -31,8 +31,8 @@ versioned policy configuration.
 ### Existing direction
 
 NovaFit should normally create two or three full-body strength sessions, prioritize
-the athlete's goals, maintain structural balance, stay within time constraints, and
-prescribe approximately three sets of 3–8 reps at about one RIR. The starting
+the athlete's declared goals, validate structural balance at onboarding, stay within
+time constraints, and prescribe approximately three sets of 3–8 reps at about one RIR. The starting
 prescription should be derived from demonstrated capability and must not prescribe
 failure.
 
@@ -42,8 +42,8 @@ NovaFit chooses session frequency before choosing a split. For beginner and
 intermediate athletes, three full-body sessions are the preferred v1 structure;
 two full-body sessions are used when only two trainable days are available. A
 four-session upper/lower split is allowed only when four compatible days are
-available and three full-body sessions cannot fit required priority-goal and
-structural-balance work within the athlete's maximum session duration. Extra
+available and three full-body sessions cannot fit required priority-goal work within
+the athlete's maximum session duration. Extra
 available days alone do not justify extra sessions.
 
 v1 does not generate body-part, push/pull/legs, or five-or-more-session splits.
@@ -60,27 +60,41 @@ result for a given athlete. Two valid implementations could select different
 exercises, starting loads, rep ranges, schedules, and mesocycle lengths while both
 appearing to satisfy the prose.
 
-### Questions to resolve
+### Resolved checklist
 
-1. How is starting load calculated from a true 1RM, a low-rep assessment, or an
-   RIR-adjusted estimated 1RM?
-2. How does NovaFit choose the starting set count, rep-range floor and ceiling,
-   target RIR, rest time, and tempo for each exercise?
-3. How are goal exercises selected when a capability exists for the exact exercise?
-4. What qualifies as a safe prerequisite, and how is one selected when an exact
-   capability is unavailable?
-5. Does structural balance apply to the athlete's declared goals, the generated
-   program, or both?
-6. How are balance exercises selected when they are not themselves athlete goals?
-7. How are multiple goals, overlapping movement categories, and goal priorities
-   translated into weekly exercise frequency and ordering?
-8. What happens when the target volume cannot fit within the athlete's maximum
-   session duration?
-9. How are preferred days converted into a valid two- or three-session schedule,
-   especially when approximately 48 hours of separation is impossible?
-10. How is the initial mesocycle length chosen within the stated 4–8 week range?
-11. What completion conditions and mutation limits must every generated program
-    declare?
+- [x] **1.1 Starting load:** Normalize an exact-exercise capability to a reference
+  1RM, apply the versioned 3–8-rep percentage table, and round down.
+- [x] **1.2 Initial prescription:** Begin all selected work as primary compound
+  work; use compatible paired sets for time, and reduce to secondary only through a
+  recorded progression revision.
+- [x] **1.3 Exact capability:** Select the exact exercise named by the goal; merge
+  duplicate selections while retaining goal links and highest priority.
+- [x] **1.4 Missing capability:** A current, direct, exact-exercise capability is
+  required before a goal can be active or program generation can begin. A future
+  calisthenics progression exception is out of v1 scope.
+- [x] **1.5 Structural balance:** Validate the declared goal set. The athlete adds a
+  goal or records an override; v1 generates only declared goals and accepts an
+  approved override.
+- [x] **1.6 Balance exercises:** Void in v1. NovaFit does not add exercises that are
+  not declared goals.
+- [x] **1.7 Weekly goal allocation:** Give every distinct goal exercise one weekly
+  primary exposure, then award remaining feasible slots in priority rounds. Preserve
+  distinct goals that share a movement category and return a decision if even the
+  baseline does not fit.
+- [x] **1.8 Volume feasibility:** Treat OG2 volume as a soft target. Generate and
+  disclose a baseline program when it fits but misses that target; return an athlete
+  decision only when even the baseline cannot fit.
+- [x] **1.9 Schedule selection:** Treat trainable days as hard constraints and choose
+  the deterministic two- or three-session schedule closest to OG2's recovery
+  cadence; record a warning when that cadence cannot be met.
+- [x] **1.10 Initial mesocycle:** Use an evidence-led eight-week maximum for beginner
+  and intermediate programs; advanced programs require a declared 4–8-week planned
+  mesocycle. Every program may end earlier for defined evidence or completion events.
+- [x] **1.11 Completion and mutation:** Declare normal and early program-end reasons,
+  retest/deload policy, and the exact mutable versus fixed fields. Revisions are
+  bounded and evidence-backed; structural changes end the program and regenerate it.
+
+All questions in this initial program-generation policy are resolved.
 
 ### Decision complete when
 
@@ -164,10 +178,9 @@ calisthenics catalog and does not expose every field required by the v1 contract
    support?
 6. Is load represented as total load, external load, added load, or per-hand load?
 7. What load increments are available, and are they athlete/equipment-specific?
-8. Which exercises may serve as structural-balance additions or safe prerequisites?
-9. What safety notes, technique cues, default tempo, and time estimate belong to each
+8. What safety notes, technique cues, default tempo, and time estimate belong to each
    exercise?
-10. How is a catalog version frozen and referenced by historical programs?
+9. How is a catalog version frozen and referenced by historical programs?
 
 ### Decision complete when
 
@@ -242,11 +255,8 @@ periodization is outside the first progression-policy version.
 4. Are unsupported goals rejected, stored as inactive future goals, or accepted but
    excluded from the current program?
 5. How many active goals may an athlete have, and must priorities be unique?
-6. Are all seven structural-balance categories mandatory goals, or only program
-   coverage expectations?
-7. What capability freshness window applies before NovaFit requires reassessment?
-8. What happens when an athlete lacks a safe current capability for a supported goal?
-9. Are minors supported, and are there any lower/upper age restrictions or additional
+6. What capability freshness window applies before NovaFit requires reassessment?
+7. Are minors supported, and are there any lower/upper age restrictions or additional
    consent requirements?
 
 ### Decision complete when

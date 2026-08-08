@@ -1,4 +1,52 @@
+# Environment and local secrets
 .env
+.env.*
+!.env.example
 .venv/
+venv/
+env/
+ENV/
 
+# Python bytecode, tooling, and test output
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.hypothesis/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Packaging and build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+pip-wheel-metadata/
+
+# Local application data and databases
 data/
+*.sqlite
+*.sqlite3
+*.db
+
+# Logs and runtime files
+*.log
+logs/
+*.pid
+*.pid.lock
+
+# Editor and operating-system files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

@@ -24,9 +24,9 @@ for scheduled_session in program:
     program_action = review_program(program, completed_sessions)
     if program_action changes a prescription within its mutation envelope:
       create a prescription revision under the same program_id
-    if program_action == COMPLETE_PROGRAM:
+    if program_action in [GOAL_ACHIEVED, GOAL_TARGET_DATE_REACHED, COMPLETE_PROGRAM]:
       return complete_program(program)
-    if program_action == STOP_PROGRAM:
+    if program_action == STOP_PROGRAM(reason=an early_end_reason):
       return ProgramEndReport to program generation
 
     publish the next scheduled session
@@ -89,6 +89,9 @@ regress_one_variable(exercise):
     reduce reps
   else if sets can be reduced within the program's mutation envelope:
     reduce one set
+    if exercise.role == PRIMARY and exercise.set_count == 2:
+      exercise.role = SECONDARY
+      # Store the evidence and reason for the role change. Preserve all other variables.
   else if a previous exercise exists in the declared progression_path:
     regress to that exercise  # future calisthenics support
   else:
@@ -207,7 +210,7 @@ review_program(program, completed_sessions):
     return PERFORMANCE_TRIGGERED_DELOAD
   if primary exercises are mostly INTERMEDIATE or ADVANCED
      and broad_stall lasts about 4 weeks:
-    return STOP_PROGRAM(BROAD_STALL)
+    return PERFORMANCE_TRIGGERED_DELOAD
 
   return CONTINUE_PROGRAM
 ```
@@ -441,15 +444,44 @@ persistence, or a combination of them.
 ## OG2 Policy Boundary
 
 The continuous model decides when to act; OG2 heuristics constrain what actions are
-allowed. It must not bypass structural balance, clean technique, target RIR, volume
-ranges, minimum useful exercise volume, or the rule to change one progression
-variable at a time. All score definitions, weights, thresholds, and changes to them
-must be deterministic, versioned, and auditable.
+allowed. It must honor declared goals and any approved structural-balance override,
+target RIR, volume ranges, minimum useful exercise volume, and the rule to change
+one progression variable at a time. All score definitions, weights, thresholds, and
+changes to them must be deterministic, versioned, and auditable.
 
 ---
 # Progression Layer Contract
 
-## 1. Program Mutation Envelope
+## 1. Program Completion and Mutation Declaration
+
+Program generation must declare completion conditions and mutation limits when it
+creates a program. A normal completion is either a verified active-goal achievement,
+an active goal's target date, or the declared maximum program duration. At a normal
+completion, NovaFit completes the declared deload/taper when applicable, performs
+the declared capability retests, records the outcome of every active goal, and
+returns control to program generation.
+
+An early end is not a medical diagnosis. It records the observed program outcome and
+its evidence: a safety stop, persistent broad regression after the permitted deload,
+broad stall, a mutation boundary, changed constraints, or an athlete-requested end.
+Exercise-level changes and a performance-triggered deload must be attempted only as
+allowed by the mutation envelope before an evidence-led early end.
+
+```
+ProgramCompletionPolicy {
+  maximum_duration_weeks
+  active_goal_targets       # exercise, success measure, target value, target date
+  completion_retest_policy
+  deload_policy
+
+  normal_end_reasons: [GOAL_ACHIEVED, GOAL_TARGET_DATE_REACHED, COMPLETE_PROGRAM]
+  early_end_reasons: [SAFETY_STOP, BROAD_REGRESSION, BROAD_STALL,
+                      PROGRESSION_BOUNDARY_REACHED, PROGRESSION_PATH_EXHAUSTED,
+                      PROGRAM_CONSTRAINTS_CHANGED, ATHLETE_REQUESTED_END]
+}
+```
+
+## 2. Program Mutation Envelope
 
 Program generation must declare the changes that progression policy may make while
 preserving the program's identity.
@@ -458,13 +490,11 @@ preserving the program's identity.
 ProgramMutationEnvelope {
   program_id
   policy_version
-  completion_conditions
-  deload_policy
-  retest_policy
-  capability_retests
+  completion_policy
 
-  fixed: [goals, weekly_structure, movement_allocation]
-  permitted_variables: [reps, load, sets]
+  fixed: [goals, exact_exercises, weekly_structure, movement_allocation, schedule]
+  permitted_variables: [reps, load, sets, role]
+  permitted_role_transition: PRIMARY_TO_SECONDARY_ONLY
 
   for each progression_track:
     modality_policy: FIXED_EXERCISE | DECLARED_PROGRESSION_PATH
@@ -478,6 +508,13 @@ ProgramMutationEnvelope {
     capability_retest_protocol
 }
 ```
+
+Within a v1 track, reps may change only within its declared rep range, load only by
+its declared equipment increments and within its declared load bounds, and set count
+only between three primary sets and two secondary sets. Each revision changes one
+variable at a time and stores its evidence and reason. Changing a fixed field,
+selecting an undeclared exercise, or exceeding a declared bound ends the program;
+the factual `ProgramEndReport` is the only input to regeneration.
 
 V1 general weighted strength uses `FIXED_EXERCISE`. Bench press remains bench press;
 NovaFit may change its reps, load, or sets only within the declared bounds. Weighted
@@ -502,15 +539,18 @@ without permitting arbitrary exercise substitution.
 Every allowed change creates a new prescription revision under the same
 `program_id`. It does not create a new program.
 
-## 2. Program-ending Conditions
+## 3. Program-ending Conditions
 
 ```
 should_stop_program(program, evidence):
   if athlete reports pain requiring the programmed work to stop:
     return SAFETY_STOP
 
-  if program.completion_conditions are satisfied:
+  if a declared capability retest verifies any active goal target:
     return GOAL_ACHIEVED
+
+  if an active goal target date has arrived:
+    return GOAL_TARGET_DATE_REACHED
 
   if progression or regression reaches the mutation envelope boundary:
     return PROGRESSION_BOUNDARY_REACHED
@@ -524,7 +564,7 @@ should_stop_program(program, evidence):
   if broad stall reaches sufficient evidence and confidence:
     return BROAD_STALL
 
-  if the declared program duration is complete:
+  if program.completion_policy.maximum_duration_weeks is complete:
     return COMPLETE_PROGRAM
 
   if goals, equipment, availability, or other program constraints change:
@@ -538,7 +578,7 @@ should_stop_program(program, evidence):
 
 A stop reason describes what happened; it does not prescribe the replacement.
 
-## 3. Handoff Contract
+## 4. Handoff Contract
 
 When a program stops, progression policy returns a factual report to program
 generation:
@@ -567,7 +607,7 @@ The report must contain the evidence and policy decisions that caused the stop. 
 must not choose replacement exercises, restructure the schedule, or generate the
 next program.
 
-## 4. Continuous Model Parameters
+## 5. Continuous Model Parameters
 
 The continuous model must be driven by a versioned policy configuration rather than
 hard-coded constants:
@@ -604,7 +644,7 @@ may change evidence values and progression cadence, but must not silently change
 policy configuration. All inputs, contributions, thresholds, and outputs must be
 stored with the decision.
 
-## 5. Logging Edge Cases
+## 6. Logging Edge Cases
 
 ```
 classify_logged_exposure(log):
