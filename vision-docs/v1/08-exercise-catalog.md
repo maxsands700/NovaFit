@@ -8,7 +8,7 @@ that release into NovaFit's new application database through migrations and an
 idempotent seed. A database rebuild must recreate the same catalog identities and
 content; neither database-local row numbers nor display names are identities.
 
-V1 contains exactly the following 20 general-strength exercises. Adding, removing,
+V1 contains exactly the following 21 general-strength exercises. Adding, removing,
 renaming, or changing the policy metadata of an exercise requires a new catalog
 release.
 
@@ -32,6 +32,7 @@ release.
 | Barbell Conventional Deadlift | `barbell-conventional-deadlift` | `BARBELL` | Posterior chain | Bilateral |
 | Barbell Romanian Deadlift | `barbell-romanian-deadlift` | `BARBELL` | Posterior chain | Bilateral |
 | Dumbbell Romanian Deadlift | `dumbbell-romanian-deadlift` | `DUMBBELL` | Posterior chain | Bilateral |
+| Barbell Hip Thrust | `barbell-hip-thrust` | `BARBELL` | Posterior chain | Bilateral |
 | Pike Compression | `pike-compression` | `BODYWEIGHT` | Core/compression | Bilateral |
 | GHD Sit-up | `ghd-sit-up` | `BODYWEIGHT` | Core/compression | Bilateral |
 

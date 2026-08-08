@@ -30,35 +30,48 @@ The visible grid follows the supplied Excel template. One exercise is a block
 of one row per prescribed set. The first row contains the labels; every
 exercise block uses the same columns:
 
-| Exercise | Tempo | Target Reps | Completed Reps | RPE | RIR | Failed Reps | Pain | Technique Notes |
-|---|---|---:|---:|---:|---:|:---:|:---:|---|
-| Back Squat | 10X0 | 5 @ 225 lb |  |  |  | ☐ | ☐ | Proud chest, braced core, explode from the hole |
-|  |  | 5 @ 225 lb |  |  |  | ☐ | ☐ |  |
-|  |  | 5 @ 225 lb |  |  |  | ☐ | ☐ |  |
+| Exercise | Tempo | Prescription | Outcome | Completed Reps | RPE | RIR | Skip Reason | Pain | Technique Notes |
+|---|---|---|---|---:|---:|---:|---|:---:|---|
+| Back Squat | 10X0 | 5 reps @ 225 lb |  |  |  |  |  | ☐ | Proud chest, braced core, explode from the hole |
+|  |  | 5 reps @ 225 lb |  |  |  |  |  | ☐ |  |
+|  |  | 5 reps @ 225 lb |  |  |  |  |  | ☐ |  |
 
 `Exercise`, `Tempo`, and `Technique Notes` are each merged vertically across
 the exercise's complete set block and centered both horizontally and
-vertically. `Target Reps` remains one read-only cell per set so the prescribed
-dose stays adjacent to the athlete's result. A future exercise with a different
+vertically. `Prescription` remains one read-only cell per set so the prescribed
+reps and load stay adjacent to the athlete's result. A future exercise with a different
 number of sets receives a block of that many rows; it is not forced into a
 three-row shape.
 
-Exercise, tempo, target reps, and technique notes are NovaFit-owned and
+Exercise, tempo, prescription, and technique notes are NovaFit-owned and
 read-only. The athlete fills out only:
 
-1. `Completed Reps`
-2. `RPE`
-3. `RIR`
-4. `Failed Reps` — checkbox
-5. `Pain` — checkbox
+1. `Outcome` — `COMPLETED` or `SKIPPED`
+2. `Completed Reps`, `RPE`, and `RIR` when the outcome is `COMPLETED`
+3. `Skip Reason` when the outcome is `SKIPPED`: `PERFORMANCE_LIMIT`, `PAIN`, or
+   `NON_PERFORMANCE`
+4. `Pain` — checkbox when pain occurred during an otherwise completed set
 
-RPE and RIR are required for every completed work set. The sheet should display the
-expected counterpart while either value is entered. Submission is invalid when a
-value is missing or when `abs(RPE - (10 - RIR)) > 0.5`. A checked `Failed Reps` box
-records that the set included one or more failed reps. A checked `Pain` box is a
-safety signal: NovaFit must hold automatic progression for that exercise and direct
-the athlete to use safe judgment before continuing. Normal exertion and ordinary
-muscle soreness are not pain.
+Every submitted row must have a terminal outcome. For `COMPLETED`, completed reps,
+RPE, and RIR are required; `Skip Reason` must be blank. For `SKIPPED`, a skip reason
+is required and completed-rep/RPE/RIR/Pain fields must be blank. A skipped exercise
+is a block whose every row is skipped; an abandoned workout is a valid partial submission
+only after its remaining rows are explicitly skipped. An unsubmitted blank workout
+or exercise is `NO_OBSERVATION`, not failure.
+
+The sheet displays the expected RPE/RIR counterpart while either is entered;
+`abs(RPE - (10 - RIR)) > 0.5` requires correction. The athlete always performs the
+published prescription at its stated load; actual load is not an athlete-input field.
+The importer derives `INCOMPLETE_SET` when `completed_reps < prescribed_reps`.
+`completed_reps > prescribed_reps` is an undeclared prescription and requires a
+correction. `PERFORMANCE_LIMIT` and `INCOMPLETE_SET` are performance evidence;
+`NON_PERFORMANCE` is non-comparable. `PAIN`, whether selected as a skip reason or
+checked on a completed set, initiates the pain-hold rule below. Normal exertion and
+ordinary muscle soreness are not pain.
+
+Technique notes are read-only catalog guidance. NovaFit neither asks the athlete to
+report technique breakdown nor evaluates form in v1; every submitted completed rep
+is accepted under the athlete's good-form disclaimer.
 
 ## Formatting
 
@@ -77,12 +90,12 @@ NovaFit replaces the template's uncoloured presentation with its theme only:
 black for the primary header and strong boundaries, gold for prominent actions
 and active emphasis, grey for muted or read-only prescription cells, and white
 for the normal workout surface. Gold and black must retain legible contrast;
-colour is never the only way to communicate an editable cell, a failed rep, or
-a pain signal.
+colour is never the only way to communicate an editable cell or a pain signal.
 
 Editable cells should be visually distinct from NovaFit-owned cells while
-remaining quiet enough that the prescription is easy to scan. Checkboxes are
-used for `Failed Reps` and `Pain`; no text such as `Yes` or `No` is required.
+remaining quiet enough that the prescription is easy to scan. `Outcome` and `Skip
+Reason` are validated dropdowns; `Pain` is a checkbox. No free-text explanation is
+required for v1.
 The `Submit Workout Completion` action follows the same NovaFit black-and-gold
 treatment and remains below the final exercise block.
 
@@ -97,8 +110,12 @@ publish_workout(athlete, scheduled_session):
 
 submit_workout(workbook):
   verify workbook schema, athlete, publication identity, and row hashes
-  read only the five athlete-input fields from each set row
+  read Outcome, Completed Reps, RPE, RIR, Skip Reason, and Pain from each set row
   reject changed NovaFit-owned cells and formulas in athlete-input cells
+  require every submitted row to have a valid terminal outcome
+  require fields appropriate to the selected outcome
+  derive INCOMPLETE_SET when completed_reps < prescribed_reps
+  require correction when completed_reps > prescribed_reps
   create an immutable completed-workout revision
   import it once, even if the submission is retried
   mark the workbook IMPORTED
@@ -146,18 +163,20 @@ machine-only records before it accepts a submission.
 
 ## Progression Handoff
 
-After a successful import, NovaFit evaluates every exercise independently using
-the completed reps, effort evidence, failed-rep signal, and pain signal. The
-rules in `04-progression-policies.md` determine whether the next exposure
-progresses, stays the same, regresses, or stops. A checked pain box takes
-precedence over normal progression. Missing or inconsistent RPE/RIR returns
-`NEEDS_CORRECTION` and blocks the next prescription; the original submission and
-its correcting revision remain auditable.
+After a successful import, NovaFit evaluates each exercise independently. A fully
+completed exercise can update evidence even when another exercise is skipped. An
+`INCOMPLETE_SET` or `PERFORMANCE_LIMIT` is failure evidence; `NON_PERFORMANCE` is
+non-comparable. Pain takes precedence: NovaFit puts the program in `PAIN_HOLD`,
+publishes no next workout, and awaits either an auditable correction or the athlete's
+confirmation that the report stands. Confirmation ends the program as
+`PAIN_REPORTED`; NovaFit does not provide injury programming or substitutions.
+Missing or inconsistent RPE/RIR returns `NEEDS_CORRECTION` and blocks the next
+prescription; the original submission and its correcting revision remain auditable.
 
 The athlete's workflow stays deliberately small:
 
 1. Open the published workout.
 2. Perform each prescribed set.
-3. Enter completed reps, RPE, and RIR for every completed work set.
-4. Check Failed Reps or Pain only when they occurred.
+3. Mark each row completed or skipped; enter the required result or skip reason.
+4. Check Pain when it occurred during a completed set.
 5. Submit the completed workout and await the next published session.

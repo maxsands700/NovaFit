@@ -166,7 +166,7 @@ All progression-policy questions in this section are resolved.
 
 ### Resolved checklist
 
-- [x] **3.1 Exact scope:** Use the 20 exercises enumerated in
+- [x] **3.1 Exact scope:** Use the 21 exercises enumerated in
   `08-exercise-catalog.md`. Pull-up and Dip retain one identity with optional external
   load; plank and ab-wheel rollout are excluded.
 - [x] **3.2 Legacy database:** Treat `data/OG2/novafit.sqlite3` as immutable research
@@ -215,10 +215,10 @@ progression, onboarding, and architecture contracts.
 
 ### Existing direction
 
-Progression evaluates prescribed and completed sets, reps, load, RPE/RIR, failed
-reps, technique, and pain. Google Sheets currently allows the athlete to enter only
-completed reps, RPE, RIR, failed reps, and pain; technique notes are read-only
-NovaFit cues.
+Progression evaluates the published prescription, per-set outcome, completed reps,
+RPE/RIR, derived incomplete sets, skip reason, and pain. Google Sheets allows the
+athlete to enter the outcome, completed evidence or skip reason, and pain; prescribed
+load and technique notes are read-only NovaFit content.
 
 ### Why a decision is needed
 
@@ -232,20 +232,30 @@ exercise or stops the entire program.
   RIR drives progression and RPE is corroborating validation data.
 - [x] **4.7 RPE/RIR validation:** Accept pairs within `0.5` of `RPE = 10 - RIR`;
   otherwise preserve the submission and require an auditable correction.
+- [x] **4.1 Prescribed load:** The athlete always uses the published load. It is
+  read-only, actual load is not loggable, and a mismatched load is rejected rather
+  than used as comparable evidence.
+- [x] **4.2 Technique:** V1 does not collect or evaluate a technique-breakdown
+  signal. Submitted reps are assumed to use good form under the athlete disclaimer.
+- [x] **4.3 Incomplete reps:** Remove `Failed Reps` from Sheets and the workout schema.
+  Derive `INCOMPLETE_SET` when `completed_reps < prescribed_reps`.
+- [x] **4.4 Partial and skipped work:** Every submitted set has terminal outcome
+  `COMPLETED` or `SKIPPED(reason)`. A partial workout explicitly skips remaining
+  rows; an unsubmitted workout is `NO_OBSERVATION`.
+- [x] **4.5 Skip classification:** `PERFORMANCE_LIMIT` is failure evidence, `PAIN`
+  initiates a pain hold, and `NON_PERFORMANCE` is non-comparable evidence.
+- [x] **4.8 Pain response:** Pain immediately stops the affected exercise and puts
+  the program in `PAIN_HOLD`; NovaFit publishes nothing further or offers a
+  substitute, rehabilitation plan, or diagnosis.
+- [x] **4.9 Pain correction:** A pain entry may be corrected through an immutable
+  workout revision. NovaFit recomputes affected decisions; the hold is released only
+  when no pain remains and evidence is valid. Confirmed pain ends the program as
+  `PAIN_REPORTED`.
+- [x] **4.10 Processable partial workout:** A submitted workout is processable only
+  when every row has a valid terminal outcome and outcome-appropriate fields.
+  Complete exercises update independently; other rows are classified by their reason.
 
-### Questions remaining
-
-- **4.1** Must the athlete always use the prescribed load, or must actual completed load be
-   loggable per set?
-- **4.2** How does the athlete report explicit technique breakdown?
-- **4.3** Is `Failed Reps` a count, a per-set boolean, or an exercise-level signal?
-- **4.4** How are skipped exercises, skipped sets, and workouts abandoned midway represented?
-- **4.5** Which skip reasons are performance-related, pain-related, or non-comparable?
-- **4.8** When pain is reported, does NovaFit stop the exercise, hold the next workout, end
-   the entire program, or choose among those actions using a declared rule?
-- **4.9** Can an athlete later indicate that a pain entry was accidental, and how does that
-   correction affect prior decisions?
-- **4.10** What makes a partial workout complete enough to submit and process?
+All workout-evidence and safety-semantics questions in this section are resolved.
 
 ### Decision complete when
 
@@ -391,8 +401,7 @@ At minimum, define exact expected outputs for:
 6. Successful double progression through the top of a rep range and a load increase.
 7. An easy pass, pass, hard pass, first failure, and repeated failure.
 8. Missing or inconsistent mandatory RPE/RIR rejected and later corrected.
-9. A skipped exercise, partial workout, failed rep, technique breakdown, and pain
-   report.
+9. A skipped exercise, partial workout, incomplete set, and pain report.
 10. An isolated regression that does not deload the whole program.
 11. Broad regression that does trigger a deload.
 12. Capability retesting and program regeneration.

@@ -26,6 +26,12 @@ for scheduled_session in program:
       next_exercise_action = PROGRESS | MAINTAIN | REGRESS | STOP
       store the outcome, action, and reason
 
+    if any outcome is PAIN_HOLD:
+      place program in PAIN_HOLD
+      do not publish another workout
+      await correction or athlete confirmation
+      return PAIN_HOLD
+
     program_action = review_program(program, completed_sessions)
     if program_action changes a prescription within its mutation envelope:
       create a prescription revision under the same program_id
@@ -41,14 +47,15 @@ for scheduled_session in program:
 
 ```
 evaluate_exercise(exposure):
-  record prescribed and completed sets, reps, load, ending RPE/RIR, and technique
+  record published prescription, completed sets/reps, ending RPE/RIR, and pain
+  require completed load == published prescribed load
 
   if athlete reports pain:
     stop the exercise
     # Normal exertion and ordinary DOMS are not pain.
-    return STOP_AND_SEEK_SAFE_GUIDANCE
+    return PAIN_HOLD
 
-  if prescribed work was completed with clean technique:
+  if prescribed work was completed:
     if ending_RIR > target_RIR:
       return EASY_PASS
     if ending_RIR == target_RIR:
@@ -58,8 +65,24 @@ evaluate_exercise(exposure):
   return FAIL
 ```
 
-The default `target_RIR` is about 1. NovaFit assumes the athlete reports RIR and
-technique honestly.
+The default `target_RIR` is about 1. NovaFit assumes the athlete uses the published
+load, reports RIR honestly, and performs all submitted reps with good form. Form is
+not an athlete input or an evaluated signal in v1.
+
+## Pain Hold and Corrections
+
+A pain report on a completed set or a `SKIPPED(PAIN)` row immediately puts the
+program in `PAIN_HOLD`. The athlete stops the affected exercise; NovaFit makes no
+substitution, rehabilitation prescription, or diagnosis, and publishes no next
+workout while the hold remains.
+
+The athlete may submit an immutable correction if the pain entry was accidental.
+NovaFit recomputes every affected exercise and program decision from the corrected
+revision, retaining the original log and superseded decisions for audit. If no pain
+report remains and all required evidence is valid, NovaFit releases the hold and
+continues the existing program. If the athlete confirms that the pain report stands,
+NovaFit ends the program with `PAIN_REPORTED`; the athlete must be ready to train
+safely again before beginning a new evidence-based program.
 
 ## Exercise-level Decision
 
@@ -153,7 +176,7 @@ performance_triggered_deload(program):
 capability_retest_and_stop(program):
   for progression_track in program.capability_retests:
     athlete performs the declared capability_retest_protocol
-    record exercise, load, reps, RPE/RIR, technique, and pain
+    record exercise, load, reps, RPE/RIR, and pain
     update the athlete's CurrentCapability with the dated test result
 
   recompute exercise and program evidence from the new capabilities
@@ -490,8 +513,9 @@ the declared capability retests, records the outcome of every active goal, and
 returns control to program generation.
 
 An early end is not a medical diagnosis. It records the observed program outcome and
-its evidence: a safety stop, persistent broad regression after the permitted deload,
-broad stall, a mutation boundary, changed constraints, or an athlete-requested end.
+its evidence: a confirmed pain report, persistent broad regression after the
+permitted deload, broad stall, a mutation boundary, changed constraints, or an
+athlete-requested end.
 Exercise-level changes and a performance-triggered deload must be attempted only as
 allowed by the mutation envelope before an evidence-led early end.
 
@@ -503,7 +527,7 @@ ProgramCompletionPolicy {
   deload_policy
 
   normal_end_reasons: [GOAL_ACHIEVED, GOAL_TARGET_DATE_REACHED, COMPLETE_PROGRAM]
-  early_end_reasons: [SAFETY_STOP, BROAD_REGRESSION, BROAD_STALL,
+  early_end_reasons: [PAIN_REPORTED, BROAD_REGRESSION, BROAD_STALL,
                       PROGRESSION_BOUNDARY_REACHED, PROGRESSION_PATH_EXHAUSTED,
                       PROGRAM_CONSTRAINTS_CHANGED, ATHLETE_REQUESTED_END]
 }
@@ -571,8 +595,8 @@ Every allowed change creates a new prescription revision under the same
 
 ```
 should_stop_program(program, evidence):
-  if athlete reports pain requiring the programmed work to stop:
-    return SAFETY_STOP
+  if program.status == PAIN_HOLD and athlete confirms pain_report_stands:
+    return PAIN_REPORTED
 
   if a declared capability retest verifies any active goal target:
     return GOAL_ACHIEVED
@@ -697,39 +721,52 @@ classify_logged_exposure(log):
   if a required capability retest is unlogged or invalid:
     return WAITING_FOR_VALID_RETEST  # do not resume the program
 
-  if the entire workout or exercise is unlogged:
+  if the workout was never submitted:
     return NO_OBSERVATION  # do not treat missing data as failure
 
-  if any completed work set is missing RPE or RIR:
+  require every submitted set row has outcome COMPLETED or SKIPPED
+
+  if any row is SKIPPED with reason PAIN or reports pain:
+    return PAIN_HOLD
+
+  if any completed row has completed_reps > prescribed_reps:
+    return NEEDS_CORRECTION(UNDECLARED_REPS)
+
+  if any completed row has completed_load != published_prescribed_load:
+    return NEEDS_CORRECTION(UNDECLARED_LOAD)
+
+  if any COMPLETED row is missing completed_reps, RPE, or RIR:
     return NEEDS_CORRECTION(MISSING_EFFORT_DATA)
 
-  if abs(reported_RPE - (10 - reported_RIR)) > 0.5:
+  if any COMPLETED row has abs(RPE - (10 - RIR)) > 0.5:
     return NEEDS_CORRECTION(RPE_RIR_MISMATCH)
 
-  if the log is otherwise invalid or internally inconsistent:
+  if any COMPLETED row has a skip reason:
     return NEEDS_CORRECTION(INVALID_LOG)
 
-  if the athlete skipped the exercise because of pain:
-    return STOP_AND_SEEK_SAFE_GUIDANCE
+  if any SKIPPED row has no reason, populated completion fields, or checked Pain:
+    return NEEDS_CORRECTION(INVALID_LOG)
 
-  if the athlete attempted but could not complete the prescription:
+  if any COMPLETED row has completed_reps < prescribed_reps:
     return FAIL
 
-  if the exercise was skipped for a non-performance reason:
+  if any row is SKIPPED with reason PERFORMANCE_LIMIT:
+    return FAIL
+
+  if any row is SKIPPED with reason NON_PERFORMANCE:
     return NON_COMPARABLE  # maintain and lower confidence
 
-  if the athlete performed an undeclared exercise or prescription:
+  if the athlete performed an undeclared exercise:
     return NON_COMPARABLE  # do not infer progress or regression
 
-  if the athlete explicitly reports technique breakdown:
-    return FAIL
-
-  # Otherwise clean technique is assumed under the athlete disclaimer.
+  # Good form is assumed under the athlete disclaimer.
   return COMPARABLE_EXPOSURE
 ```
 
-Partial workouts must be evaluated exercise by exercise. A valid completed exercise
-may update its own evidence even when another exercise is missing or failed. Late
-log corrections must recompute affected evidence and create an auditable replacement
-decision; previous decisions are preserved. A log awaiting mandatory effort-data
-correction blocks the next prescription for that program.
+Partial workouts are evaluated exercise by exercise. An exercise updates evidence
+only when all of its prescribed rows are `COMPLETED`; another exercise may be
+skipped, failed, or held without invalidating that completed exercise's evidence. A
+submitted partial workout is valid only when every remaining set is explicitly
+`SKIPPED` with a reason. Late log corrections recompute affected evidence and create
+an auditable replacement decision; previous decisions are preserved. A log awaiting
+mandatory correction or a `PAIN_HOLD` blocks the next prescription for that program.
