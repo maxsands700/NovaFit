@@ -26,10 +26,15 @@ Foundation -> Exercise Catalog -> Onboarding -> Program Generation
 
 ## 1. Exercise Catalog
 
-- Model exercises, modalities, movement categories, equipment, and supported measures.
-- Load and validate the v1 weighted-strength exercise catalog.
+- Model the UUID-based exercises, revisions, catalog releases, modalities, movement
+  categories, equipment, load conventions, and supported measures specified in
+  `08-exercise-catalog.md`.
+- Create the source-controlled v1 catalog release and load it idempotently into the
+  new application database. Do not import, modify, or depend on
+  `data/OG2/novafit.sqlite3`.
 - Add catalog queries and persistence.
-- Demonstrate exercise lookup and goal/exercise support validation.
+- Demonstrate stable IDs across database rebuilds, catalog validation, exercise
+  lookup, historical revision resolution, and goal/exercise support validation.
 
 ## 2. Onboarding
 

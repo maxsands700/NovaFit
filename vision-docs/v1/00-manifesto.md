@@ -21,7 +21,10 @@ Items 1 and 4 are the athlete's responsibility. In v1, NovaFit does not monitor 
 The purpose of NovaFit is to perform items 2, 3, 5, and 6 and communicate them to the athlete in an easy way. Athletes do not want to waste their time. NovaFit should make it extremely simple for the athlete. All the athlete should have to do is follow the prescribed workout given to them, log the results, and await for the next scheduled workout.
 
 # The "Source of Truth" / Data
-Version 1.0 of NovaFit will focus on **general weighted strength training**: barbell, dumbbell, and weighted-bodyweight exercises (such as weighted pull-ups). Later, we can add:
+Version 1.0 of NovaFit will focus on **general strength training** with the exact
+barbell, dumbbell, pull-up, dip, and bodyweight-core exercises defined in
+`08-exercise-catalog.md`. Pull-ups and dips may use external load without becoming
+separate exercise identities. Later, we can add:
 1. Weighted Hypertrophy Training
 2. Calisthenics Strength Training
 3. Calisthenics Hypertrophy Training

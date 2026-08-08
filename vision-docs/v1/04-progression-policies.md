@@ -102,8 +102,10 @@ progression. An intermediate exercise starts at `0.5`, normally requiring about 
 successful exposures. The continuous model updates that rate independently for each
 exercise from observed responses to overload.
 
-For weighted-bodyweight exercises, `load` means external load. Dumbbell and barbell
-increments come from the athlete's available equipment.
+For pull-ups and dips, `load` means external load. Valid increments come from the
+athlete's available equipment. If more detailed inventory is unavailable, the v1
+defaults are `5 lb` total for barbell and `5 lb` per hand (`10 lb` aggregate) for a
+paired-dumbbell exercise, as defined in `08-exercise-catalog.md`.
 
 ### Advanced
 
@@ -219,9 +221,9 @@ Use the best valid clean `RIR_adjusted_e1RM` as the session's estimated-strength
 observation. Retain the raw value for auditing. RPE and RIR are mandatory for every
 completed work-set observation.
 
-For weighted pull-ups, estimate from total system load (`bodyweight + external_load`),
+For pull-ups and dips, estimate from total system load (`bodyweight + external_load`),
 then subtract bodyweight when reporting the equivalent external load. Dumbbell loads
-must use the exercise library's consistent per-hand or total-load convention.
+must use the canonical catalog's consistent per-hand or total-load convention.
 
 Initial load calculations and the initial mutation envelope belong to program
 generation. Standard load increments and progression parameters belong to this
@@ -415,6 +417,13 @@ overload variable. The rep-range ceiling is a boundary, not a required destinati
 This returns work to the baseline rep schema as soon as the next load tier is
 supported and avoids accumulating unnecessary rep volume.
 
+For catalog exercises that support only `BODYWEIGHT_REPS`, skip the load-tier test
+and progress reps within the declared envelope. If the athlete reaches its upper
+boundary without completing the goal, return
+`STOP_PROGRAM(EXERCISE_PROGRESSION_BOUNDARY_REACHED)` so the athlete can retest and
+program generation can create a new evidence-based program. V1 does not silently
+add external load to a rep-only exercise.
+
 ## Continuous Program Evidence
 
 `Primary` means an exercise whose current program role is `PRIMARY`. An affected
@@ -535,9 +544,9 @@ variable at a time and stores its evidence and reason. Changing a fixed field,
 selecting an undeclared exercise, or exceeding a declared bound ends the program;
 the factual `ProgramEndReport` is the only input to regeneration.
 
-V1 general weighted strength uses `FIXED_EXERCISE`. Bench press remains bench press;
-NovaFit may change its reps, load, or sets only within the declared bounds. Weighted
-pull-ups also retain their exercise identity while external load changes.
+V1 general strength uses `FIXED_EXERCISE`. Bench press remains bench press;
+NovaFit may change its reps, load, or sets only within the declared bounds. Pull-ups
+and dips also retain their exercise identity while external load changes.
 
 Future calisthenics programs may use `DECLARED_PROGRESSION_PATH`:
 

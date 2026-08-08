@@ -1,7 +1,9 @@
 # Generating the program
 From the above information we should be able to generate a program, with a gated check first:
 
-Since v1.0 implements general weighted strength training—barbell, dumbbell, and weighted-bodyweight exercises—the program should still be structured as recommended by OG2:
+Since v1.0 implements general strength training using the exact barbell, dumbbell,
+pull-up, dip, and bodyweight-core exercises in `08-exercise-catalog.md`, the program
+should still be structured as recommended by OG2:
 1. Warmup
 2. Skill Work
 3. Strength Work
@@ -23,8 +25,9 @@ generate_program(athlete):
 
   for goal in athlete.active_goals:
     require goal.adaptation == strength
-    require goal.exercise is supported by the v1 exercise library
-    require goal.exercise.modality in [barbell, dumbbell, weighted_bodyweight]
+    require goal.exercise revision is active in the selected v1 catalog release
+    require goal.exercise.modality in [BARBELL, DUMBBELL,
+                                       BODYWEIGHT_EXTERNAL_LOAD, BODYWEIGHT]
     require athlete has the equipment required for goal.exercise
     require goal has a measurable target and target date
     require athlete has a current capability for goal.exercise
@@ -110,8 +113,10 @@ not infer a starting load from a different exercise or an unassessed capability.
 
 NovaFit chooses the initial prescribed rep target, selects the corresponding
 conservative percentage below, multiplies it by `reference_1RM`, and rounds the
-result down to the equipment's available increment. These percentages are intended
-to start at roughly 1–2 RIR; rounding must never increase the load.
+result down to the equipment's next valid load tier. Load conventions, athlete
+inventory, and the default `5 lb` barbell and `5 lb`-per-hand dumbbell increments are
+defined in `08-exercise-catalog.md`. These percentages are intended to start at
+roughly 1–2 RIR; rounding must never increase the load.
 
 | Initial rep target | Starting load |
 | --- | --- |
@@ -125,6 +130,12 @@ to start at roughly 1–2 RIR; rounding must never increase the load.
 Any future calisthenics-specific programming policy may allow a goal exercise to
 use a capability from an earlier, declared progression. Capability and loading must
 then be progression-specific. That exception is outside v1.
+
+Pike compressions and GHD sit-ups use their exact rep assessment and the catalog's
+rep-only capability branch. They do not enter the estimated-1RM calculation or
+receive external load in v1. Their prescription progresses through reps within the
+declared program envelope; reaching that boundary ends the program for retesting
+and regeneration rather than silently introducing load.
 
 ### Initial Prescription and Paired Sets
 
@@ -242,11 +253,17 @@ build_initial_program(athlete):
 
   for exercise in exercises:
     prescription = primary_strength_prescription(exercise, athlete.training_level)
-    reference_1RM = capability_to_reference_1RM(exercise, athlete.capabilities)
-    starting_load = round_down_to_increment(
-      reference_1RM * initial_load_percentage(prescription.rep_target)
-    )
-    # The capability must be exercise-specific. Never round upward or prescribe failure.
+    if exercise supports LOAD_FOR_REPS or EXTERNAL_LOAD_FOR_REPS:
+      reference_1RM = capability_to_reference_1RM(exercise, athlete.capabilities)
+      starting_load = round_down_to_valid_equipment_tier(
+        reference_1RM * initial_load_percentage(prescription.rep_target)
+      )
+      # Never round upward or prescribe failure.
+    else if exercise supports BODYWEIGHT_REPS:
+      reference_max_reps = capability.completed_reps + capability.reported_RIR
+      prescription = rep_only_strength_prescription(reference_max_reps,
+                                                    program_policy_version)
+    # Every branch requires an exact-exercise capability.
 
   weekly_allocation = assign_one_feasible_exposure_to_each(
     exercises, sessions, allow_compatible_paired_sets=true
@@ -284,7 +301,9 @@ build_initial_program(athlete):
   mesocycle = choose_initial_mesocycle(athlete)
   completion_policy = declare_completion_policy(athlete.active_goals, mesocycle)
   mutation_envelope = declare_v1_mutation_envelope(exercises, schedule)
-  return program(version, mesocycle, sessions, completion_policy, mutation_envelope)
+  return program(version, catalog_release_id, exercise_revision_ids,
+                 athlete_equipment_version, mesocycle, sessions,
+                 completion_policy, mutation_envelope)
 ```
 
 Progression after the initial program is generated is defined in `04-progression-policies.md`.

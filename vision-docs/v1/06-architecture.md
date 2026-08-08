@@ -334,8 +334,18 @@ transaction.
 - Use SQLite initially through SQLAlchemy, but add Alembic migrations from the first
   schema. Avoid SQLite-specific domain assumptions so PostgreSQL remains a deployment
   change rather than a rewrite.
-- Generate stable application IDs (UUID/ULID) rather than exposing integer database
-  row IDs to Sheets, calendars, API clients, or webhooks.
+- Create a new application database from the new migrations and catalog seed. The
+  legacy `data/OG2/novafit.sqlite3` is immutable research material and must never be
+  modified, migrated, imported, opened by runtime code, or used as a test fixture.
+- Use immutable UUIDs for catalog releases, exercises, exercise revisions, equipment
+  types, and athlete equipment records. Generate each initial catalog UUID once and
+  commit it explicitly in the authoritative seed so every database rebuild preserves
+  identity. Use stable UUID/ULID application IDs elsewhere rather than exposing
+  integer database row IDs to Sheets, calendars, API clients, or webhooks.
+- Treat the source-controlled release described in `08-exercise-catalog.md` as the
+  catalog authority. A program stores its catalog-release UUID, exact exercise and
+  exercise-revision UUIDs, and athlete-equipment version so historical prescriptions
+  remain reproducible.
 - Keep completed workouts, program/prescription revisions, and progression decisions
   append-only. A correction supersedes a prior record; it does not erase history.
 - Store timestamps in UTC and preserve the athlete/session timezone needed to render

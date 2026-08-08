@@ -13,7 +13,12 @@ Athlete {
 
   training_level: beginner, # dictates pace of progress, more thought here as this is nuanced
 
-  equipment: ["pull-up bar", "rings", "barbell"],
+  equipment: {
+    barbell: { bar_weight: 45_lb, default_total_increment: 5_lb },
+    plates: [2.5_lb, 5_lb, 10_lb, 25_lb, 45_lb],
+    dumbbells: { available_per_hand: [5_lb, 10_lb, ..., 100_lb] },
+    pull_up_bar: true
+  },
   training_availability: {
     max_sessions_per_week: 5,
     max_session_duration_minutes: 120,
@@ -25,10 +30,17 @@ Athlete {
 In v1, `trainable_days` is a hard availability constraint, not a soft preference.
 NovaFit never schedules a workout on another day.
 
+Equipment onboarding records the athlete's actual supported load tiers: bar weight,
+plate denominations, fixed dumbbell pairs or adjustable-dumbbell settings, and any
+pull-up/dip external-loading configurations. The defaults and per-exercise load
+conventions are defined in `08-exercise-catalog.md`. Athlete equipment records have
+their own UUIDs and reference canonical equipment-type UUIDs.
+
 ## Athlete Goals
 The second onboarding task is to establish the athlete's goals. Every goal should be SMART: specific, measurable, achievable, relevant, and time-bound. Here are some examples:
 
-Every goal names exactly one supported exercise from the exercise library. That
+Every goal names exactly one supported exercise from the canonical catalog in
+`08-exercise-catalog.md`. That
 exercise reference is canonical: when the athlete has a current capability for it,
 NovaFit programs that exact exercise and does not substitute a variation.
 Onboarding cannot activate the goal until the athlete supplies that direct,

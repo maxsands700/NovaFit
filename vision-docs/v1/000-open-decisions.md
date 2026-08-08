@@ -164,31 +164,42 @@ All progression-policy questions in this section are resolved.
 
 ## 3. Canonical v1 Exercise Catalog
 
-### Existing direction
+### Resolved checklist
 
-V1 supports general weighted strength using barbell, dumbbell, and
-weighted-bodyweight exercises. Program generation depends on a supported exercise
-library containing modality, equipment, movement category, measures, technique
-guidance, and progression information.
+- [x] **3.1 Exact scope:** Use the 20 exercises enumerated in
+  `08-exercise-catalog.md`. Pull-up and Dip retain one identity with optional external
+  load; plank and ab-wheel rollout are excluded.
+- [x] **3.2 Legacy database:** Treat `data/OG2/novafit.sqlite3` as immutable research
+  material only. Never modify, import, migrate, or use it at runtime; build a separate
+  v1 database from new migrations and the new catalog seed.
+- [x] **3.3 Identity:** Give every exercise and equipment type an immutable UUID
+  generated once and committed in the seed. Use a unique slug only as an alternate
+  lookup key, and give athlete equipment records separate UUIDs.
+- [x] **3.4 Classification:** Give each exercise one primary structural-balance
+  category plus non-identity tags, a declared modality, and bilateral or unilateral
+  laterality.
+- [x] **3.5 Measures:** Use load-for-reps assessments for barbell and dumbbell work,
+  external-load/bodyweight assessments for pull-ups and dips, and rep-only
+  assessments for pike compressions and GHD sit-ups. Every assessment is direct,
+  exact-exercise, and has valid RPE/RIR.
+- [x] **3.6 Load representation:** Use total load including the bar for barbell,
+  per-hand load for paired dumbbells, working-hand or held load for one-dumbbell
+  movements, external added load for pull-ups/dips, and no load for v1 rep-only core
+  work. Store bodyweight separately where total-system-load estimation needs it.
+- [x] **3.7 Increments:** Use the athlete's actual equipment tiers. Defaults are
+  `5 lb` total for barbell and `5 lb` per hand (`10 lb` aggregate) for paired
+  dumbbells; single-dumbbell work advances the working or held dumbbell by `5 lb`.
+- [x] **3.8 Guidance and time:** Require an execution standard, concise cues, common
+  faults, safety note, tempo, setup time, laterality, and transition group for every
+  exercise revision. Guidance is informational; derive duration from setup, tempo,
+  reps, sides, transitions, and rest.
+- [x] **3.9 Versioning:** Publish immutable, checksummed catalog releases and exercise
+  revisions. Programs freeze the catalog release, exercise/revision UUIDs, and
+  athlete-equipment version used to generate them.
 
-The supplied `data/OG2/novafit.sqlite3` is a useful source dataset, but it is not yet
-explicitly designated as the canonical application catalog. It is primarily a broad
-calisthenics catalog and does not expose every field required by the v1 contracts.
-
-### Questions to resolve
-
-1. What exact exercises are supported by v1?
-2. Is `data/OG2/novafit.sqlite3` an authoritative source, an import fixture, or
-   research data used to create a separate versioned catalog?
-3. What is the canonical identifier for each exercise and each equipment item?
-4. Which modality and movement categories apply to each exercise?
-5. Which goal success measures and capability assessment types does each exercise
-   support?
-6. Is load represented as total load, external load, added load, or per-hand load?
-7. What load increments are available, and are they athlete/equipment-specific?
-8. What safety notes, technique cues, default tempo, and time estimate belong to each
-   exercise?
-9. How is a catalog version frozen and referenced by historical programs?
+All canonical v1 exercise-catalog questions in this section are resolved. Normative
+catalog behavior is defined in `08-exercise-catalog.md` and its referenced program,
+progression, onboarding, and architecture contracts.
 
 ### Decision complete when
 
